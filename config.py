@@ -20,7 +20,7 @@ class Config:
     DROPOUT = 0.3            # Giữ dropout cao với data nhiều
     
     # Training hyperparameters (cho 13K từ)
-    BATCH_SIZE = 64          # Tăng batch size với data lớn
+    BATCH_SIZE = 16          # Giảm batch size để có thể đẩy graph lên GPU
     LEARNING_RATE = 0.001    # Learning rate chuẩn
     NUM_EPOCHS = 30          # Giảm epochs, với 13K data train nhanh hơn
     TEACHER_FORCING_RATIO = 0.7  # Tăng teacher forcing
@@ -39,7 +39,11 @@ class Config:
     POS_LOSS_WEIGHT = 0.5
     
     # Device
-    DEVICE = 'cpu'
+    DEVICE = 'cuda'          # Sử dụng CUDA (GPU)
+    
+    # DataLoader optimization
+    PIN_MEMORY = True        # Pin memory để tăng tốc transfer data lên GPU
+    NUM_WORKERS = 2          # Số workers cho DataLoader (giảm để tiết kiệm memory)
     
     # Logging (với ~183 batches/epoch ở batch_size=64)
     LOG_INTERVAL = 20        # Log mỗi 20 batches

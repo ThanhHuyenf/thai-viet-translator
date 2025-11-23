@@ -1,3 +1,4 @@
+
 """Training script cho Thai-Vietnamese Seq2Seq model"""
 import torch
 import torch.nn as nn
@@ -197,9 +198,9 @@ def main():
     viet_vocab.save(os.path.join(Config.VOCAB_DIR, 'viet_vocab.pkl'))
     pos_vocab.save(os.path.join(Config.VOCAB_DIR, 'pos_vocab.pkl'))
     
-    # Build graph for GCN
+    # Build graph for GCN and move to GPU
     df_for_graph = load_dictionary(Config.DATA_PATH)
-    graph_data = build_graph(df_for_graph)
+    graph_data = build_graph(df_for_graph, device=device)
     print(f"✓ Graph: {graph_data.num_nodes} nodes, {graph_data.num_edges} edges")
     
     # Create dataset and split
@@ -219,12 +220,16 @@ def main():
     
     print(f"✓ Train: {len(train_dataset)} | Val: {len(val_dataset)} | Test: {len(test_dataset)}")
     
+    # DataLoader with pin_memory for faster GPU transfer
     train_loader = DataLoader(train_dataset, batch_size=Config.BATCH_SIZE, 
-                             shuffle=True, collate_fn=collate_fn)
+                             shuffle=True, collate_fn=collate_fn,
+                             pin_memory=Config.PIN_MEMORY, num_workers=Config.NUM_WORKERS)
     val_loader = DataLoader(val_dataset, batch_size=Config.BATCH_SIZE, 
-                           shuffle=False, collate_fn=collate_fn)
+                           shuffle=False, collate_fn=collate_fn,
+                           pin_memory=Config.PIN_MEMORY, num_workers=Config.NUM_WORKERS)
     test_loader = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE, 
-                            shuffle=False, collate_fn=collate_fn)
+                            shuffle=False, collate_fn=collate_fn,
+                            pin_memory=Config.PIN_MEMORY, num_workers=Config.NUM_WORKERS)
     
     # Build model
     print("\n" + "="*50)

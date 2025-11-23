@@ -15,9 +15,16 @@ def load_dictionary(path='data/dic.csv'):
     return df
 
 
-def build_graph(df):
+def build_graph(df, device='cpu'):
     """
     Build graph từ DataFrame, kết nối các từ có cùng LoaiTu (POS tag)
+    
+    Args:
+        df: DataFrame chứa dữ liệu
+        device: Device để đẩy graph data lên ('cpu' hoặc 'cuda')
+    
+    Returns:
+        Data object đã được chuyển lên device
     """
     num_nodes = len(df)
 
@@ -55,4 +62,9 @@ def build_graph(df):
     x = torch.randn((num_nodes, 16))
 
     data = Data(x=x, edge_index=edge_index)
+    
+    # Chuyển graph data lên GPU ngay
+    data = data.to(device)
+    print(f"✓ Graph data moved to {device}")
+    
     return data

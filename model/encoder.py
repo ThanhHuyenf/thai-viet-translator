@@ -64,41 +64,38 @@ class Encoder(nn.Module):
         # Dropout
         self.dropout = nn.Dropout(dropout)
     
-    def get_gcn_embeddings(self, indices, device):
+    def get_gcn_embeddings(self, indices):
         """
         Lấy GCN embeddings cho các indices
         
         Args:
             indices: Tensor chứa word indices [batch_size, seq_len]
-            device: Device để chuyển tensor
         
         Returns:
             gcn_embeds: [batch_size, seq_len, gcn_output_dim]
+        
+        Note:
+            Tất cả đều chạy trên GPU (graph_data đã được chuyển lên GPU)
         """
         if not self.use_gcn:
             return None
         
         batch_size, seq_len = indices.size()
         
-        # Forward pass qua GCN
-        x = self.graph_data.x.to(device)
-        edge_index = self.graph_data.edge_index.to(device)
-        gcn_output = self.gcn(x, edge_index)  # [num_nodes, gcn_output_dim]
+        # Forward pass qua GCN - graph_data đã ở trên GPU
+        gcn_output = self.gcn(self.graph_data.x, self.graph_data.edge_index)  # [num_nodes, gcn_output_dim]
         
-        # Lấy embeddings cho các indices
-        gcn_embeds = []
-        for i in range(batch_size):
-            batch_embeds = []
-            for j in range(seq_len):
-                idx = indices[i, j].item()
-                if idx < gcn_output.size(0):
-                    batch_embeds.append(gcn_output[idx])
-                else:
-                    # Fallback: zero vector
-                    batch_embeds.append(torch.zeros(self.gcn_output_dim, device=device))
-            gcn_embeds.append(torch.stack(batch_embeds))
+        # Lấy embeddings cho các indices sử dụng indexing
+        indices_flat = indices.view(-1)  # [batch_size * seq_len]
         
-        gcn_embeds = torch.stack(gcn_embeds)  # [batch_size, seq_len, gcn_output_dim]
+        # Clamp indices để tránh out of bounds
+        valid_indices = torch.clamp(indices_flat, 0, gcn_output.size(0) - 1)
+        
+        # Lấy embeddings
+        gcn_embeds_flat = gcn_output[valid_indices]  # [batch_size * seq_len, gcn_output_dim]
+        
+        # Reshape về [batch_size, seq_len, gcn_output_dim]
+        gcn_embeds = gcn_embeds_flat.view(batch_size, seq_len, self.gcn_output_dim)
         
         return gcn_embeds
     
@@ -123,7 +120,7 @@ class Encoder(nn.Module):
         
         # Combine with GCN embeddings nếu có
         if self.use_gcn:
-            gcn_embeds = self.get_gcn_embeddings(x, device)  # [batch_size, seq_len, gcn_output_dim]
+            gcn_embeds = self.get_gcn_embeddings(x)  # [batch_size, seq_len, gcn_output_dim]
             gcn_embeds = self.gcn_projection(gcn_embeds)  # [batch_size, seq_len, embed_size]
             embedded = torch.cat([embedded, gcn_embeds], dim=2)  # [batch_size, seq_len, embed_size*2]
         
