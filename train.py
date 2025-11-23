@@ -209,17 +209,20 @@ def main():
     dataset = TranslationDataset(df, thai_vocab, viet_vocab, pos_vocab, Config.MAX_LEN)
     
     train_size = int(Config.TRAIN_SPLIT * len(dataset))
-    test_size = len(dataset) - train_size
+    val_size = int(Config.VAL_SPLIT * len(dataset))
+    test_size = len(dataset) - train_size - val_size
     
-    train_dataset, test_dataset = random_split(
-        dataset, [train_size, test_size],
+    train_dataset, val_dataset, test_dataset = random_split(
+        dataset, [train_size, val_size, test_size],
         generator=torch.Generator().manual_seed(Config.SEED)
     )
     
-    print(f"✓ Train: {len(train_dataset)} | Test: {len(test_dataset)}")
+    print(f"✓ Train: {len(train_dataset)} | Val: {len(val_dataset)} | Test: {len(test_dataset)}")
     
     train_loader = DataLoader(train_dataset, batch_size=Config.BATCH_SIZE, 
                              shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=Config.BATCH_SIZE, 
+                           shuffle=False, collate_fn=collate_fn)
     test_loader = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE, 
                             shuffle=False, collate_fn=collate_fn)
     
@@ -254,6 +257,8 @@ def main():
     print("TRAINING")
     print("="*50)
     
+    best_val_loss = float('inf')
+    
     for epoch in range(1, Config.NUM_EPOCHS + 1):
         print(f"\nEpoch [{epoch}/{Config.NUM_EPOCHS}]")
         print("-" * 50)
@@ -262,8 +267,26 @@ def main():
             model, train_loader, optimizer, criterion, device, Config, epoch
         )
         
-        print(f"\n✓ Loss: {train_loss:.4f} | "
+        print(f"\n✓ Train - Loss: {train_loss:.4f} | "
               f"Word Acc: {train_word_acc:.4f} | POS Acc: {train_pos_acc:.4f}")
+        
+        # Validation
+        val_loss, val_word_acc, val_pos_acc = evaluate(
+            model, val_loader, criterion, device, Config
+        )
+        
+        print(f"✓ Val   - Loss: {val_loss:.4f} | "
+              f"Word Acc: {val_word_acc:.4f} | POS Acc: {val_pos_acc:.4f}")
+        
+        # Save best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            save_checkpoint(
+                model, optimizer, epoch, val_loss,
+                {'thai_vocab': thai_vocab, 'viet_vocab': viet_vocab, 'pos_vocab': pos_vocab},
+                os.path.join(Config.SAVE_DIR, 'best_model.pt')
+            )
+            print(f"✓ Saved best model (val_loss: {val_loss:.4f})")
         
         if epoch % Config.SAVE_INTERVAL == 0:
             save_checkpoint(

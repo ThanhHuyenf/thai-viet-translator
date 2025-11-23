@@ -9,7 +9,8 @@ import numpy as np
 
 def load_data(csv_path='data/dic.csv'):
     """
-    Load dữ liệu từ CSV
+    Load dữ liệu từ CSV cho word-by-word translation
+    Sử dụng 3 cột: TuNgu (Thai), LoaiTu (POS), NghiaTiengViet (Vietnamese)
     
     Returns:
         DataFrame với các cột: TuNgu, LoaiTu, NghiaTiengViet
@@ -17,6 +18,9 @@ def load_data(csv_path='data/dic.csv'):
     # Đọc CSV với quote handling để xử lý dấu phẩy trong giá trị
     df = pd.read_csv(csv_path, on_bad_lines='skip', quotechar='"', encoding='utf-8')
     df.columns = df.columns.str.strip().str.replace("'", "").str.replace('"', '')
+    
+    # Chỉ lấy 3 cột cần thiết
+    df = df[['TuNgu', 'LoaiTu', 'NghiaTiengViet']]
     
     # Loại bỏ các hàng có giá trị NaN
     df = df.dropna(subset=['TuNgu', 'LoaiTu', 'NghiaTiengViet'])
@@ -26,7 +30,13 @@ def load_data(csv_path='data/dic.csv'):
     df['LoaiTu'] = df['LoaiTu'].astype(str).str.strip()
     df['NghiaTiengViet'] = df['NghiaTiengViet'].astype(str).str.strip()
     
-    print(f"✓ Loaded {len(df)} entries from {csv_path}")
+    # Loại bỏ các giá trị rỗng hoặc không hợp lệ
+    df = df[df['TuNgu'] != '']
+    df = df[df['NghiaTiengViet'] != '']
+    df = df[df['LoaiTu'] != '']
+    
+    print(f"✓ Loaded {len(df)} entries for word-by-word translation")
+    print(f"✓ Columns: TuNgu (Thai word) -> LoaiTu (POS) + NghiaTiengViet (Vietnamese meaning)")
     return df
 
 
@@ -105,27 +115,33 @@ class TranslationDataset(Dataset):
     
     def __getitem__(self, idx):
         """
+        Xử lý word-by-word translation: 1 từ Thai -> nghĩa tiếng Việt + POS tag
+        
         Returns:
-            thai_indices: Tensor của Thai word indices
-            viet_indices: Tensor của Vietnamese word indices (target)
-            pos_indices: Tensor của POS tag indices
+            thai_indices: Tensor của Thai word indices (1 từ)
+            viet_indices: Tensor của Vietnamese word indices (có thể nhiều từ)
+            pos_indices: Tensor của POS tag indices (1 tag)
             thai_len: Độ dài thực của Thai sequence
             viet_len: Độ dài thực của Vietnamese sequence
         """
         row = self.df.iloc[idx]
         
-        # Thai input (single word)
+        # Thai input (single word - word-by-word translation)
         thai_word = str(row['TuNgu']).strip()
         thai_indices = [self.thai_vocab.get_idx(thai_word)]
         
-        # Vietnamese output (có thể là nhiều từ)
+        # Vietnamese output (có thể là nhiều từ do một từ Thai có thể dịch thành cụm từ Việt)
         viet_phrase = str(row['NghiaTiengViet']).strip()
+        # Xử lý các trường hợp có dấu phẩy (nhiều nghĩa) - chỉ lấy nghĩa đầu tiên
+        if ',' in viet_phrase:
+            viet_phrase = viet_phrase.split(',')[0].strip()
+        
         viet_words = viet_phrase.split()
         viet_indices = [self.viet_vocab.SOS_token]
-        viet_indices += [self.viet_vocab.get_idx(w) for w in viet_words]
+        viet_indices += [self.viet_vocab.get_idx(w) for w in viet_words if w]
         viet_indices.append(self.viet_vocab.EOS_token)
         
-        # POS tag (cũng cần SOS/EOS như Vietnamese)
+        # POS tag (single tag for the Thai word)
         pos_tag = str(row['LoaiTu']).strip()
         pos_indices = [self.pos_vocab.SOS_token]
         pos_indices.append(self.pos_vocab.get_idx(pos_tag))

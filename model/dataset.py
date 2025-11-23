@@ -4,8 +4,14 @@ from torch_geometric.data import Data
 
 
 def load_dictionary(path='data/dic.csv'):
-    df = pd.read_csv(path, on_bad_lines="skip")
+    """Load từ điển từ CSV file với 3 cột chính: TuNgu, LoaiTu, NghiaTiengViet"""
+    df = pd.read_csv(path, on_bad_lines="skip", encoding='utf-8')
     df.columns = df.columns.str.strip().str.replace("'", "").str.replace('"', '')
+    
+    # Chỉ lấy 3 cột cần thiết và loại bỏ NaN
+    df = df[['TuNgu', 'LoaiTu', 'NghiaTiengViet']].dropna()
+    
+    print(f"✓ Loaded {len(df)} entries for word-by-word translation")
     return df
 
 

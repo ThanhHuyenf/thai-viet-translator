@@ -82,7 +82,7 @@ class Vocabulary:
 
 def build_vocabularies(df):
     """
-    Xây dựng 3 vocabularies từ DataFrame
+    Xây dựng 3 vocabularies từ DataFrame cho word-by-word translation
     
     Args:
         df: DataFrame với các cột TuNgu (Thai), LoaiTu (POS), NghiaTiengViet (Vietnamese)
@@ -95,25 +95,31 @@ def build_vocabularies(df):
     pos_vocab = Vocabulary("pos")
     
     for _, row in df.iterrows():
-        # Thai words
+        # Thai words (mỗi từ Thai là 1 đơn vị)
         thai_word = str(row['TuNgu']).strip()
-        if thai_word and thai_word != 'nan':
+        if thai_word and thai_word != 'nan' and thai_word != '':
             thai_vocab.add_word(thai_word)
         
-        # Vietnamese words
+        # Vietnamese words (tách thành các từ riêng lẻ)
         viet_phrase = str(row['NghiaTiengViet']).strip()
-        if viet_phrase and viet_phrase != 'nan':
+        if viet_phrase and viet_phrase != 'nan' and viet_phrase != '':
+            # Xử lý trường hợp có dấu phẩy (nhiều nghĩa) - chỉ lấy nghĩa đầu tiên
+            if ',' in viet_phrase:
+                viet_phrase = viet_phrase.split(',')[0].strip()
+            
             # Tách thành các từ riêng lẻ
             for word in viet_phrase.split():
-                viet_vocab.add_word(word)
+                if word:  # Bỏ qua từ rỗng
+                    viet_vocab.add_word(word)
         
-        # POS tags
+        # POS tags (loại từ)
         pos_tag = str(row['LoaiTu']).strip()
-        if pos_tag and pos_tag != 'nan':
+        if pos_tag and pos_tag != 'nan' and pos_tag != '':
             pos_vocab.add_word(pos_tag)
     
-    print(f"✓ Thai vocabulary size: {len(thai_vocab)}")
-    print(f"✓ Vietnamese vocabulary size: {len(viet_vocab)}")
-    print(f"✓ POS vocabulary size: {len(pos_vocab)}")
+    print(f"✓ Thai vocabulary size: {len(thai_vocab)} words")
+    print(f"✓ Vietnamese vocabulary size: {len(viet_vocab)} words")
+    print(f"✓ POS vocabulary size: {len(pos_vocab)} tags")
+    print(f"✓ Built vocabularies for word-by-word translation")
     
     return thai_vocab, viet_vocab, pos_vocab
